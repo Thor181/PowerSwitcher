@@ -58,10 +58,46 @@ public sealed class ProfileApplier
             actions.Add(new ProfileAction("Схема питания", GetSchemeName(schemeId), ok));
         }
 
+        if (profile.PowerMode is PowerMode powerMode)
+        {
+            bool ok = _powerManager.SetPowerMode(powerMode);
+            actions.Add(new ProfileAction("Режим питания", powerMode.GetLabel(), ok));
+        }
+
         if (profile.CpuBoostMode is CpuBoostMode mode)
         {
             bool ok = _powerManager.SetCpuBoostMode(mode);
             actions.Add(new ProfileAction("Turbo Boost", mode.GetLabel(), ok));
+        }
+
+        if (profile.MaxProcessorState is byte maxState)
+        {
+            bool ok = _powerManager.SetMaxProcessorState(maxState);
+            actions.Add(new ProfileAction("Макс. состояние процессора", $"{maxState}%", ok));
+        }
+
+        if (profile.EnergyPerformancePreference is byte epp)
+        {
+            bool ok = _powerManager.SetEnergyPerformancePreference(epp);
+            actions.Add(new ProfileAction("Энергоэффективность процессора", $"{epp}", ok));
+        }
+
+        if (profile.DisplayOffTimeout is int displayOff)
+        {
+            bool ok = _powerManager.SetDisplayOffTimeout(displayOff);
+            actions.Add(new ProfileAction("Отключение экрана", FormatTimeout(displayOff), ok));
+        }
+
+        if (profile.SleepTimeout is int sleep)
+        {
+            bool ok = _powerManager.SetSleepTimeout(sleep);
+            actions.Add(new ProfileAction("Сон", FormatTimeout(sleep), ok));
+        }
+
+        if (profile.AdaptiveBrightness is bool adaptive)
+        {
+            bool ok = _powerManager.SetAdaptiveBrightness(adaptive);
+            actions.Add(new ProfileAction("Адаптивная яркость", adaptive ? "Вкл" : "Выкл", ok));
         }
 
         if (profile.EnergySaver is bool energySaver)
@@ -70,7 +106,7 @@ public sealed class ProfileApplier
             actions.Add(new ProfileAction("Экономия заряда", energySaver ? "Вкл" : "Выкл", ok));
         }
 
-        // Яркость — последней: смена схемы и Turbo Boost переактивируют схему питания,
+        // Яркость — последней: смена схемы и запись её параметров переактивируют схему питания,
         // и Windows восстанавливает яркость, сохранённую в схеме, затирая только что выставленную.
         if (profile.Brightness is byte brightness)
         {
@@ -83,6 +119,23 @@ public sealed class ProfileApplier
             ProfileName = profile.Name,
             Actions = actions,
         };
+    }
+
+    /// <summary>«Никогда», «45 с», «5 мин», «1 ч», «1 ч 30 мин».</summary>
+    public static string FormatTimeout(int seconds)
+    {
+        if (seconds <= 0)
+            return "Никогда";
+        if (seconds < 60)
+            return $"{seconds} с";
+
+        var time = TimeSpan.FromSeconds(seconds);
+        if (time.TotalHours < 1)
+            return $"{(int)time.TotalMinutes} мин";
+
+        return time.Minutes == 0
+            ? $"{(int)time.TotalHours} ч"
+            : $"{(int)time.TotalHours} ч {time.Minutes} мин";
     }
 
     private string GetSchemeName(Guid schemeId)

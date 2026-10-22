@@ -116,19 +116,60 @@
                         <TextBlock Grid.Column="1" x:Name="EditTitle" Style="{StaticResource TitleText}" Margin="8,0,0,0" TextTrimming="CharacterEllipsis"/>
                     </Grid>
 
+                    <!-- Экран -->
+                    <TextBlock Style="{StaticResource SectionHeader}" Text="Экран" Margin="0,4,0,0"/>
+
                     <TextBlock Style="{StaticResource FieldHeader}" Text="Монитор"/>
                     <ComboBox x:Name="DisplayCombo" Style="{StaticResource FluentComboBox}" SelectionChanged="DisplayCombo_SelectionChanged"/>
 
-                    <TextBlock Style="{StaticResource FieldHeader}" Text="Частота обновления, Гц" Margin="0,16,0,6"/>
+                    <TextBlock Style="{StaticResource FieldHeader}" Text="Частота обновления, Гц"/>
                     <ComboBox x:Name="RefreshRateCombo" Style="{StaticResource FluentComboBox}" SelectionChanged="RefreshRateCombo_SelectionChanged"/>
 
-                    <TextBlock Style="{StaticResource FieldHeader}" Text="Схема питания" Margin="0,16,0,6"/>
+                    <TextBlock Style="{StaticResource FieldHeader}" Text="Яркость"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Style="{StaticResource IconText}" Text="&#xE706;"/>
+                        <Slider Grid.Column="1"
+                                x:Name="BrightnessSlider"
+                                Style="{StaticResource FluentSlider}"
+                                Minimum="0" Maximum="100"
+                                SmallChange="1" LargeChange="10"
+                                Margin="12,0"
+                                ValueChanged="BrightnessSlider_ValueChanged"/>
+                        <TextBlock Grid.Column="2" x:Name="BrightnessValueLabel" Style="{StaticResource BodyText}" Text="—" Width="40" TextAlignment="Right"/>
+                    </Grid>
+
+                    <Grid Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Style="{StaticResource BodyText}" Text="Адаптивная яркость"/>
+                        <CheckBox Grid.Column="1"
+                                  x:Name="AdaptiveBrightnessCheckBox"
+                                  Style="{StaticResource ToggleSwitch}"
+                                  Checked="AdaptiveBrightnessCheckBox_Changed"
+                                  Unchecked="AdaptiveBrightnessCheckBox_Changed"/>
+                    </Grid>
+
+                    <TextBlock Style="{StaticResource FieldHeader}" Text="Отключать экран через"/>
+                    <ComboBox x:Name="DisplayOffCombo" Style="{StaticResource FluentComboBox}"/>
+
+                    <!-- Питание -->
+                    <TextBlock Style="{StaticResource SectionHeader}" Text="Питание"/>
+
+                    <TextBlock Style="{StaticResource FieldHeader}" Text="Схема питания"/>
                     <ComboBox x:Name="SchemeCombo" Style="{StaticResource FluentComboBox}" SelectionChanged="SchemeCombo_SelectionChanged"/>
 
-                    <TextBlock Style="{StaticResource FieldHeader}" Text="Turbo Boost" Margin="0,16,0,6"/>
-                    <ComboBox x:Name="BoostCombo" Style="{StaticResource FluentComboBox}" DisplayMemberPath="Label" SelectionChanged="BoostCombo_SelectionChanged"/>
+                    <TextBlock Style="{StaticResource FieldHeader}" Text="Режим питания"/>
+                    <ComboBox x:Name="PowerModeCombo" Style="{StaticResource FluentComboBox}"/>
+                    <TextBlock Style="{StaticResource CaptionText}" Text="Действует только со схемой «Сбалансированная»." Margin="0,4,0,0"/>
 
-                    <Grid Margin="0,20,0,0">
+                    <Grid Margin="0,12,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
@@ -141,24 +182,22 @@
                                   Unchecked="EnergySaverCheckBox_Changed"/>
                     </Grid>
 
-                    <Grid Margin="0,12,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Style="{StaticResource IconText}" Text="&#xE706;" ToolTip="Яркость"/>
-                        <Slider Grid.Column="1"
-                                x:Name="BrightnessSlider"
-                                Style="{StaticResource FluentSlider}"
-                                Minimum="0" Maximum="100"
-                                SmallChange="1" LargeChange="10"
-                                Margin="12,0"
-                                ValueChanged="BrightnessSlider_ValueChanged"/>
-                        <TextBlock Grid.Column="2" x:Name="BrightnessValueLabel" Style="{StaticResource BodyText}" Text="—" Width="40" TextAlignment="Right"/>
-                    </Grid>
+                    <TextBlock Style="{StaticResource FieldHeader}" Text="Переходить в сон через"/>
+                    <ComboBox x:Name="SleepCombo" Style="{StaticResource FluentComboBox}"/>
 
-                    <Grid Margin="0,20,0,0">
+                    <!-- Процессор -->
+                    <TextBlock Style="{StaticResource SectionHeader}" Text="Процессор"/>
+
+                    <TextBlock Style="{StaticResource FieldHeader}" Text="Turbo Boost"/>
+                    <ComboBox x:Name="BoostCombo" Style="{StaticResource FluentComboBox}" DisplayMemberPath="Label" SelectionChanged="BoostCombo_SelectionChanged"/>
+
+                    <TextBlock Style="{StaticResource FieldHeader}" Text="Максимальная мощность"/>
+                    <ComboBox x:Name="MaxProcessorCombo" Style="{StaticResource FluentComboBox}"/>
+
+                    <TextBlock Style="{StaticResource FieldHeader}" Text="Энергоэффективность"/>
+                    <ComboBox x:Name="EppCombo" Style="{StaticResource FluentComboBox}"/>
+
+                    <Grid Margin="0,24,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="8"/>
@@ -196,6 +235,40 @@
                 <Button Content="Создать" Style="{StaticResource AccentButton}" HorizontalAlignment="Right" MinWidth="120" Margin="0,20,0,0" Click="AddProfile_Click"/>
             </StackPanel>
 
+            <!-- ========== Страница автопереключения ========== -->
+            <StackPanel x:Name="SettingsPage" Grid.Row="0" Margin="24,16,24,20" Visibility="Collapsed">
+                <StackPanel.RenderTransform>
+                    <TranslateTransform/>
+                </StackPanel.RenderTransform>
+                <Grid Margin="-8,0,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button Style="{StaticResource SubtleButton}" ToolTip="Назад" Click="Back_Click">
+                        <TextBlock Style="{StaticResource IconText}" Text="&#xE76B;" FontSize="12"/>
+                    </Button>
+                    <TextBlock Grid.Column="1" Style="{StaticResource TitleText}" Text="Автопереключение" Margin="8,0,0,0"/>
+                </Grid>
+
+                <TextBlock Style="{StaticResource CaptionText}"
+                           Text="Профиль применяется сам, когда меняется источник питания или заряд опускается до порога. Выбранный вручную профиль действует до следующего такого события."
+                           TextWrapping="Wrap"
+                           Margin="0,8,0,0"/>
+
+                <TextBlock Style="{StaticResource FieldHeader}" Text="При работе от сети"/>
+                <ComboBox x:Name="AcProfileCombo" Style="{StaticResource FluentComboBox}"/>
+
+                <TextBlock Style="{StaticResource FieldHeader}" Text="При работе от батареи"/>
+                <ComboBox x:Name="BatteryProfileCombo" Style="{StaticResource FluentComboBox}"/>
+
+                <TextBlock Style="{StaticResource FieldHeader}" Text="При низком заряде"/>
+                <ComboBox x:Name="LowBatteryProfileCombo" Style="{StaticResource FluentComboBox}"/>
+
+                <TextBlock Style="{StaticResource FieldHeader}" Text="Низкий заряд — это"/>
+                <ComboBox x:Name="LowBatteryThresholdCombo" Style="{StaticResource FluentComboBox}"/>
+            </StackPanel>
+
             <!-- Строка состояния (результат последнего действия) -->
             <TextBlock Grid.Row="1"
                        x:Name="StatusText"
@@ -210,10 +283,20 @@
                     Background="{DynamicResource FooterBackground}"
                     BorderBrush="{DynamicResource DividerStroke}"
                     BorderThickness="0,1,0,0">
-                <DockPanel Margin="24,0" VerticalAlignment="Center">
-                    <TextBlock Style="{StaticResource IconText}" Text="&#xE945;" FontSize="14"/>
-                    <TextBlock x:Name="CurrentProfileLabel" Style="{StaticResource BodyText}" FontSize="12" Margin="10,0,0,0" Text="Профиль не выбран" TextTrimming="CharacterEllipsis"/>
-                </DockPanel>
+                <Grid Margin="24,0,16,0" VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="BatteryIcon" Style="{StaticResource IconText}" FontSize="16"/>
+                    <TextBlock Grid.Column="1" x:Name="BatteryLabel" Style="{StaticResource BodyText}" FontSize="12" Margin="10,0,0,0" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Grid.Column="2" x:Name="PowerLabel" Style="{StaticResource BodyText}" FontSize="12" Margin="8,0,8,0"/>
+                    <Button Grid.Column="3" Style="{StaticResource SubtleButton}" ToolTip="Автопереключение профилей" Click="Settings_Click">
+                        <TextBlock Style="{StaticResource IconText}" Text="&#xE713;"/>
+                    </Button>
+                </Grid>
             </Border>
         </Grid>
     </Border>

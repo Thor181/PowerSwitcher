@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Threading;
 using PowerSwitcher.Core;
 
 namespace PowerSwitcher.App;
@@ -21,8 +22,24 @@ public partial class MainWindow : Window
     private readonly BrightnessManager _brightnessManager = new();
     private readonly ProfileStore _profileStore = new();
     private readonly ProfileApplier _profileApplier;
+    private readonly BatteryMonitor _batteryMonitor = new();
+    private readonly DispatcherTimer _batteryTimer = new() { Interval = TimeSpan.FromSeconds(5) };
+
+    private static readonly int[] TimeoutPresets = { 60, 120, 180, 300, 600, 900, 1800, 3600, 7200, 0 };
+    private static readonly byte[] MaxProcessorPresets = { 100, 99, 90, 80, 70, 60, 50 };
+    private static readonly (byte Value, string Label)[] EppPresets =
+    {
+        (0, "Максимальная производительность"),
+        (33, "Производительность"),
+        (50, "Баланс"),
+        (70, "Экономия"),
+        (100, "Максимальная экономия"),
+    };
+    private static readonly int[] LowBatteryPresets = { 10, 15, 20, 25, 30, 40 };
 
     private ObservableCollection<PowerProfile> _profiles = new();
+    private AutoSwitchSettings _autoSwitchSettings;
+    private bool _settingsDirty;
     private PowerProfile? _selectedProfile;
     private IReadOnlyList<DisplayInfo> _displays = Array.Empty<DisplayInfo>();
     private IReadOnlyList<PowerSchemeInfo> _schemes = Array.Empty<PowerSchemeInfo>();
@@ -38,9 +55,14 @@ public partial class MainWindow : Window
         InitializeComponent();
         _profileApplier = new ProfileApplier(_displayManager, _powerManager, _brightnessManager);
         _currentPage = MainPage;
+        _autoSwitchSettings = _profileStore.LoadAutoSwitchSettings();
 
         LoadSystemData();
         LoadProfiles();
+        BindProfileOptions();
+        BindSettingsOptions();
+
+        _batteryTimer.Tick += (_, _) => UpdateBattery();
 
         SizeChanged += (_, _) => PositionWindow();
         Deactivated += (_, _) => HideFlyout();
@@ -59,6 +81,22 @@ public partial class MainWindow : Window
     public event Action<string?>? CurrentProfileChanged;
 
     public string? CurrentProfileName => _currentProfileName;
+
+    /// <summary>Вызывается после изменения настроек автопереключения.</summary>
+    public event Action? AutoSwitchSettingsChanged;
+
+    public AutoSwitchSettings AutoSwitchSettings => _autoSwitchSettings;
+
+    /// <summary>Применяет профиль по имени (для автопереключения). False — профиля нет.</summary>
+    public bool ApplyProfileByName(string name)
+    {
+        var profile = _profiles.FirstOrDefault(p => p.Name == name);
+        if (profile is null)
+            return false;
+
+        ApplyProfile(profile);
+        return true;
+    }
 
     // ---------- Показ и скрытие флайаута ----------
 
@@ -88,6 +126,8 @@ public partial class MainWindow : Window
 
         ShowPage(MainPage, animate: false);
         SetStatus(null);
+        UpdateBattery();
+        _batteryTimer.Start();
 
         MaxHeight = SystemParameters.WorkArea.Height - ScreenMargin * 2;
         RootBorder.Measure(new Size(Width, MaxHeight));
@@ -104,6 +144,8 @@ public partial class MainWindow : Window
             return;
 
         SaveIfDirty();
+        SaveSettingsIfDirty();
+        _batteryTimer.Stop();
         Hide();
         _hiddenAt = DateTime.UtcNow;
     }
@@ -150,7 +192,7 @@ public partial class MainWindow : Window
 
     private void ShowPage(FrameworkElement page, bool animate = true)
     {
-        foreach (var p in new FrameworkElement[] { MainPage, EditPage, AddPage })
+        foreach (var p in new FrameworkElement[] { MainPage, EditPage, AddPage, SettingsPage })
             p.Visibility = p == page ? Visibility.Visible : Visibility.Collapsed;
 
         var forward = page != MainPage;
@@ -216,7 +258,6 @@ public partial class MainWindow : Window
             .ToList();
         TilesList.ItemsSource = tiles;
 
-        CurrentProfileLabel.Text = _currentProfileName ?? "Профиль не выбран";
         CurrentProfileChanged?.Invoke(_currentProfileName);
     }
 
@@ -242,9 +283,17 @@ public partial class MainWindow : Window
 
     private void Back_Click(object sender, RoutedEventArgs e) => GoBack();
 
+    private void Settings_Click(object sender, RoutedEventArgs e)
+    {
+        LoadSettingsIntoControls();
+        SetStatus(null);
+        ShowPage(SettingsPage);
+    }
+
     private void GoBack()
     {
         SaveIfDirty();
+        SaveSettingsIfDirty();
         _selectedProfile = null;
         SetStatus(null);
         RefreshTiles();
@@ -314,6 +363,9 @@ public partial class MainWindow : Window
             _profileStore.SaveCurrentProfileName(null);
         }
 
+        _autoSwitchSettings.ForgetProfile(name);
+        _settingsDirty = true;
+
         GoBack();
         SetStatus($"Профиль «{name}» удалён.");
     }
@@ -353,6 +405,18 @@ public partial class MainWindow : Window
         return _profileStore.Save(_profiles);
     }
 
+    private void SaveSettingsIfDirty()
+    {
+        if (!_settingsDirty)
+            return;
+
+        _settingsDirty = false;
+        if (!_profileStore.SaveAutoSwitchSettings(_autoSwitchSettings))
+            SetStatus("Не удалось сохранить настройки автопереключения.");
+
+        AutoSwitchSettingsChanged?.Invoke();
+    }
+
     private PowerProfile SnapshotSystemSettings(string name)
     {
         var profile = new PowerProfile { Name = name };
@@ -367,7 +431,15 @@ public partial class MainWindow : Window
         if (scheme != null)
             profile.PowerSchemeId = scheme.Id;
 
+        profile.PowerMode = _powerManager.GetPowerMode();
+
         profile.CpuBoostMode = _powerManager.GetCpuBoostMode();
+        profile.MaxProcessorState = _powerManager.GetMaxProcessorState();
+        profile.EnergyPerformancePreference = _powerManager.GetEnergyPerformancePreference();
+
+        profile.DisplayOffTimeout = _powerManager.GetDisplayOffTimeout();
+        profile.SleepTimeout = _powerManager.GetSleepTimeout();
+        profile.AdaptiveBrightness = _powerManager.GetAdaptiveBrightness();
 
         profile.Brightness = _brightnessManager.GetBrightness();
 
@@ -404,11 +476,199 @@ public partial class MainWindow : Window
             }
 
             EnergySaverCheckBox.IsChecked = profile.EnergySaver == true;
+            AdaptiveBrightnessCheckBox.IsChecked = profile.AdaptiveBrightness == true;
+
+            SelectOption(PowerModeCombo, profile.PowerMode, v => ((PowerMode)v).GetLabel());
+            SelectOption(MaxProcessorCombo, profile.MaxProcessorState, v => FormatMaxProcessor((byte)v));
+            SelectOption(EppCombo, profile.EnergyPerformancePreference, v => $"Своё значение ({v})");
+            SelectOption(DisplayOffCombo, profile.DisplayOffTimeout, v => ProfileApplier.FormatTimeout((int)v));
+            SelectOption(SleepCombo, profile.SleepTimeout, v => ProfileApplier.FormatTimeout((int)v));
         }
         finally
         {
             _loading = false;
         }
+    }
+
+    // ---------- Списки с вариантами («Не менять» = null) ----------
+
+    private void BindProfileOptions()
+    {
+        BindOption(PowerModeCombo,
+            Options("Не менять", Enum.GetValues<PowerMode>().Select(m => new OptionItem(m, m.GetLabel()))),
+            (p, v) => p.PowerMode = (PowerMode?)v);
+
+        BindOption(MaxProcessorCombo,
+            Options("Не менять", MaxProcessorPresets.Select(v => new OptionItem(v, FormatMaxProcessor(v)))),
+            (p, v) => p.MaxProcessorState = (byte?)v);
+
+        BindOption(EppCombo,
+            Options("Не менять", EppPresets.Select(e => new OptionItem(e.Value, e.Label))),
+            (p, v) => p.EnergyPerformancePreference = (byte?)v);
+
+        BindOption(DisplayOffCombo,
+            Options("Не менять", TimeoutPresets.Select(t => new OptionItem(t, ProfileApplier.FormatTimeout(t)))),
+            (p, v) => p.DisplayOffTimeout = (int?)v);
+
+        BindOption(SleepCombo,
+            Options("Не менять", TimeoutPresets.Select(t => new OptionItem(t, ProfileApplier.FormatTimeout(t)))),
+            (p, v) => p.SleepTimeout = (int?)v);
+    }
+
+    private void BindOption(ComboBox combo, List<OptionItem> items, Action<PowerProfile, object?> apply)
+    {
+        combo.DisplayMemberPath = nameof(OptionItem.Label);
+        combo.ItemsSource = items;
+        combo.SelectionChanged += (_, _) =>
+        {
+            if (_loading || _selectedProfile is null || combo.SelectedItem is not OptionItem item)
+                return;
+
+            apply(_selectedProfile, item.Value);
+            _dirty = true;
+        };
+    }
+
+    private static List<OptionItem> Options(string nullLabel, IEnumerable<OptionItem> items)
+    {
+        return items.Prepend(new OptionItem(null, nullLabel)).ToList();
+    }
+
+    /// <summary>
+    /// Выбирает вариант с данным значением. Если такого пресета нет (значение снято с системы),
+    /// добавляет его в список, чтобы не потерять.
+    /// </summary>
+    private static void SelectOption(ComboBox combo, object? value, Func<object, string> customLabel)
+    {
+        var items = (List<OptionItem>)combo.ItemsSource;
+        var item = items.FirstOrDefault(i => Equals(i.Value, value));
+
+        if (item is null && value is not null)
+        {
+            item = new OptionItem(value, customLabel(value));
+            items.Insert(1, item);
+            combo.Items.Refresh();
+        }
+
+        combo.SelectedItem = item;
+    }
+
+    private static string FormatMaxProcessor(byte percent) => percent switch
+    {
+        100 => "100% — без ограничений",
+        99 => "99% — без турбо",
+        _ => $"{percent}%",
+    };
+
+    // ---------- Автопереключение ----------
+
+    private void BindSettingsOptions()
+    {
+        foreach (var combo in new[] { AcProfileCombo, BatteryProfileCombo, LowBatteryProfileCombo })
+        {
+            combo.DisplayMemberPath = nameof(OptionItem.Label);
+            combo.SelectionChanged += (_, _) => OnSettingsChanged();
+        }
+
+        LowBatteryThresholdCombo.DisplayMemberPath = nameof(OptionItem.Label);
+        LowBatteryThresholdCombo.ItemsSource = LowBatteryPresets.Select(p => new OptionItem(p, $"{p}% и ниже")).ToList();
+        LowBatteryThresholdCombo.SelectionChanged += (_, _) => OnSettingsChanged();
+    }
+
+    private void LoadSettingsIntoControls()
+    {
+        _loading = true;
+        try
+        {
+            foreach (var (combo, name) in new[]
+            {
+                (AcProfileCombo, _autoSwitchSettings.AcProfileName),
+                (BatteryProfileCombo, _autoSwitchSettings.BatteryProfileName),
+                (LowBatteryProfileCombo, _autoSwitchSettings.LowBatteryProfileName),
+            })
+            {
+                combo.ItemsSource = Options("Не переключать", _profiles.Select(p => new OptionItem(p.Name, p.Name)));
+                SelectOption(combo, name, v => (string)v);
+            }
+
+            SelectOption(LowBatteryThresholdCombo, _autoSwitchSettings.LowBatteryThreshold, v => $"{v}% и ниже");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OnSettingsChanged()
+    {
+        if (_loading)
+            return;
+
+        _autoSwitchSettings.AcProfileName = (AcProfileCombo.SelectedItem as OptionItem)?.Value as string;
+        _autoSwitchSettings.BatteryProfileName = (BatteryProfileCombo.SelectedItem as OptionItem)?.Value as string;
+        _autoSwitchSettings.LowBatteryProfileName = (LowBatteryProfileCombo.SelectedItem as OptionItem)?.Value as string;
+        if ((LowBatteryThresholdCombo.SelectedItem as OptionItem)?.Value is int threshold)
+            _autoSwitchSettings.LowBatteryThreshold = threshold;
+
+        _settingsDirty = true;
+    }
+
+    // ---------- Батарея в нижней панели ----------
+
+    private void UpdateBattery()
+    {
+        var info = _batteryMonitor.GetStatus();
+
+        if (!info.HasBattery || info.Percent is not int percent)
+        {
+            BatteryIcon.Text = string.Empty;
+            BatteryLabel.Text = "Питание от сети";
+            PowerLabel.Text = string.Empty;
+            return;
+        }
+
+        BatteryIcon.Text = GetBatteryGlyph(percent, info.IsOnAc);
+
+        var details = info.IsCharging ? "заряжается"
+            : info.IsOnAc ? "от сети"
+            : info.TimeRemaining is TimeSpan left ? FormatTimeLeft(left)
+            : null;
+        BatteryLabel.Text = details is null ? $"{percent}%" : $"{percent}% · {details}";
+
+        if (info.PowerWatts is double watts && Math.Abs(watts) >= 0.05)
+        {
+            PowerLabel.Text = watts > 0 ? $"+{watts:0.0} Вт" : $"−{-watts:0.0} Вт";
+            PowerLabel.ToolTip = watts > 0 ? "Мощность зарядки" : "Текущий расход";
+        }
+        else
+        {
+            PowerLabel.Text = string.Empty;
+        }
+    }
+
+    /// <summary>Глифы Segoe Fluent Icons: Battery0–10 и BatteryCharging0–10.</summary>
+    private static string GetBatteryGlyph(int percent, bool charging)
+    {
+        int level = Math.Clamp((int)Math.Round(percent / 10.0), 0, 10);
+
+        if (charging)
+        {
+            return level switch
+            {
+                10 => "",
+                9 => "",
+                _ => ((char)(0xE85A + level)).ToString(),
+            };
+        }
+
+        return level == 10 ? "" : ((char)(0xE850 + level)).ToString();
+    }
+
+    private static string FormatTimeLeft(TimeSpan time)
+    {
+        return time.TotalHours >= 1
+            ? $"{(int)time.TotalHours} ч {time.Minutes} мин"
+            : $"{time.Minutes} мин";
     }
 
     private static string FormatResult(ProfileApplyResult result)
@@ -482,6 +742,15 @@ public partial class MainWindow : Window
         _dirty = true;
     }
 
+    private void AdaptiveBrightnessCheckBox_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading || _selectedProfile is null)
+            return;
+
+        _selectedProfile.AdaptiveBrightness = AdaptiveBrightnessCheckBox.IsChecked;
+        _dirty = true;
+    }
+
     private void BrightnessSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (_loading)
@@ -503,4 +772,6 @@ public partial class MainWindow : Window
     }
 
     private sealed record BoostModeItem(CpuBoostMode Mode, string Label);
+
+    private sealed record OptionItem(object? Value, string Label);
 }

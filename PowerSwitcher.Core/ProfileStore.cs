@@ -97,12 +97,52 @@ public sealed class ProfileStore
         }
     }
 
-    private string GetCurrentProfilePath()
+    public AutoSwitchSettings LoadAutoSwitchSettings()
+    {
+        try
+        {
+            var path = GetSettingsPath();
+            if (!File.Exists(path))
+                return new AutoSwitchSettings();
+
+            return JsonSerializer.Deserialize<AutoSwitchSettings>(File.ReadAllText(path), JsonOptions)
+                ?? new AutoSwitchSettings();
+        }
+        catch
+        {
+            return new AutoSwitchSettings();
+        }
+    }
+
+    public bool SaveAutoSwitchSettings(AutoSwitchSettings settings)
+    {
+        try
+        {
+            var path = GetSettingsPath();
+
+            var directory = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(directory))
+                Directory.CreateDirectory(directory);
+
+            File.WriteAllText(path, JsonSerializer.Serialize(settings, JsonOptions));
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private string GetSettingsPath() => GetSiblingPath("settings.json");
+
+    private string GetCurrentProfilePath() => GetSiblingPath("current-profile.json");
+
+    private string GetSiblingPath(string fileName)
     {
         var directory = Path.GetDirectoryName(_filePath);
         return Path.Combine(
             string.IsNullOrEmpty(directory) ? "." : directory,
-            "current-profile.json");
+            fileName);
     }
 
     private static string GetDefaultPath()

@@ -6,6 +6,7 @@ public partial class App : Application
 {
     private TrayIcon? _trayIcon;
     private MainWindow? _flyout;
+    private AutoSwitcher? _autoSwitcher;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -25,6 +26,9 @@ public partial class App : Application
         flyout.CurrentProfileChanged += UpdateToolTip;
         UpdateToolTip(flyout.CurrentProfileName);
 
+        _autoSwitcher = new AutoSwitcher(flyout, trayIcon);
+        _autoSwitcher.Evaluate();
+
         // С ключом --tray приложение стартует свёрнутым в область уведомлений
         if (!e.Args.Contains("--tray", StringComparer.OrdinalIgnoreCase))
             flyout.ShowFlyout();
@@ -33,6 +37,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         _flyout?.HideFlyout();
+        _autoSwitcher?.Dispose();
         _trayIcon?.Dispose();
         base.OnExit(e);
     }

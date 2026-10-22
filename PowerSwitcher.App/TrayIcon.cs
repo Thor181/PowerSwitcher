@@ -50,6 +50,11 @@ internal sealed class TrayIcon : IDisposable
         _notifyIcon.Text = text.Length > 127 ? text[..126] + "…" : text;
     }
 
+    public void ShowNotification(string title, string text)
+    {
+        _notifyIcon.ShowBalloonTip(3000, title, text, Forms.ToolTipIcon.None);
+    }
+
     public void Dispose()
     {
         ThemeManager.ThemeChanged -= OnThemeChanged;
