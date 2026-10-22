@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="PowerSwitcher.Core/PowerSwitcher.Core.csproj" />
+  <Project Path="PowerSwitcher.TestApp/PowerSwitcher.TestApp.csproj" />
+  <Project Path="PowerSwitcher.App/PowerSwitcher.App.csproj" />
+</Solution>

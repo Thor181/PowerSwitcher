@@ -1,0 +1,34 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Светлая тема в цветах Windows 11 (WinUI) -->
+    <SolidColorBrush x:Key="FlyoutFallbackBackground" Color="#FFF3F3F3"/>
+    <SolidColorBrush x:Key="PopupBackground" Color="#FFF9F9F9"/>
+    <SolidColorBrush x:Key="PopupStroke" Color="#24000000"/>
+    <SolidColorBrush x:Key="FooterBackground" Color="#0D000000"/>
+    <SolidColorBrush x:Key="DividerStroke" Color="#14000000"/>
+
+    <SolidColorBrush x:Key="TextPrimary" Color="#E4000000"/>
+    <SolidColorBrush x:Key="TextSecondary" Color="#9E000000"/>
+    <SolidColorBrush x:Key="TextDisabled" Color="#5C000000"/>
+
+    <SolidColorBrush x:Key="ControlFill" Color="#B3FFFFFF"/>
+    <SolidColorBrush x:Key="ControlFillHover" Color="#80F9F9F9"/>
+    <SolidColorBrush x:Key="ControlFillPressed" Color="#4DF9F9F9"/>
+    <SolidColorBrush x:Key="ControlFillInputActive" Color="#FFFFFFFF"/>
+    <SolidColorBrush x:Key="ControlStroke" Color="#14000000"/>
+    <SolidColorBrush x:Key="ControlStrongStroke" Color="#72000000"/>
+
+    <SolidColorBrush x:Key="SubtleFillHover" Color="#09000000"/>
+    <SolidColorBrush x:Key="SubtleFillPressed" Color="#06000000"/>
+
+    <SolidColorBrush x:Key="ToggleOffFill" Color="#06000000"/>
+    <SolidColorBrush x:Key="ToggleOffFillHover" Color="#0F000000"/>
+    <SolidColorBrush x:Key="ToggleOffKnob" Color="#9E000000"/>
+
+    <SolidColorBrush x:Key="SliderRail" Color="#72000000"/>
+    <SolidColorBrush x:Key="SliderThumbOuter" Color="#FFFFFFFF"/>
+
+    <SolidColorBrush x:Key="ScrollThumb" Color="#72000000"/>
+
+</ResourceDictionary>
